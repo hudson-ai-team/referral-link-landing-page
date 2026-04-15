@@ -42,13 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
                             //merge the two together
-                            const mergedData = {
-                                products: {
+                            const mergedData = [
+                                {
                                     label: 'products selection',
                                     value: productSelection,
                                 },
                                 ...signUpData,
-                            };
+                            ];
 
                             // Submit the lead data
                             await window.partnerLinkLibrary.recordSignUpEvent(mergedData);
