@@ -8,6 +8,15 @@ document.addEventListener('DOMContentLoaded', () => {
     signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+
+        // grab the checkboxes
+        const checkboxes = signupForm.querySelectorAll('input[type="checkbox"]:checked');
+
+        // build a product string, comma separated
+        const productSelection = Array.from(checkboxes)
+            .map((cb) => cb.name)
+            .join(',');
+
         // 1. Prepare data
         const formData = new FormData(signupForm);
         const data = Object.fromEntries(formData.entries());
@@ -28,8 +37,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (window.partnerLinkLibrary && typeof window.partnerLinkLibrary.recordSignUpEvent === 'function') {
                     try {
                         const signUpData = window.partnerLinkLibrary.getSignUpDataFromForm('signupForm');
+
                         if (signUpData) {
-                            await window.partnerLinkLibrary.recordSignUpEvent(signUpData);
+
+
+                            //merge the two together
+                            const mergedData = {
+                                products: {
+                                    label: 'products',
+                                    value: productSelection,
+                                },
+                                ...signUpData,
+                            };
+
+                            // Submit the lead data
+                            await window.partnerLinkLibrary.recordSignUpEvent(mergedData);
+
+
                             console.log('Tracking event recorded successfully');
                         } else {
                             console.warn('Could not extract sign up data from form for tracking');
