@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             //merge the two together
                             const mergedData = {
                                 products: {
-                                    label: 'products',
+                                    label: 'products selection',
                                     value: productSelection,
                                 },
                                 ...signUpData,
