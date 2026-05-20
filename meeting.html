@@ -2,6 +2,10 @@
 <html lang="en">
 
 <head>
+    <script src="https://widget.partner.io/partnerLink.js"></script>
+<script>
+  window.partnerLinkLibrary.init();
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Partner.io | Scale Your Business</title>
@@ -16,4 +20,16 @@
 <body>
 <script src="https://js-eu1.hsforms.net/forms/embed/developer/145620171.js" defer></script>
 <div class="hs-form-html" data-region="eu1" data-form-id="b5184a88-3119-4a08-abd4-6ee9acae9e31" data-portal-id="145620171"></div>
+<script>
+    
+    // Selects the first <form> element found in the DOM
+const form = document.querySelector('form');
+
+if (form) {
+  form.addEventListener('submit', function(event) {
+      const data = window.partnerLinkLibrary.getSignUpDataFromFormElement($form);
+        window.partnerLinkLibrary.recordSignUpEvent(data);
+  });
+}
+</script>
 </body>
