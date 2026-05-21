@@ -28,9 +28,13 @@
       console.log('[partner.io] Form found, attaching submit listener:', form);
       form.addEventListener('submit', function(event) {
         console.log('[partner.io] Form submitted, recording sign-up event');
+        debugger;
         const plidField = form.querySelector('input[name="0-1/temp_pio_plid"]');
         if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
           plidField.value = window.partnerLinkLibrary.getPlid();
+          console.log('[partner.io] temp_pio_plid set to:', plidField.value);
+        } else {
+          console.warn('[partner.io] Could not set temp_pio_plid — field found:', !!plidField, '| getPlid available:', !!(window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function'));
         }
         const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
         window.partnerLinkLibrary.recordSignUpEvent(data);
