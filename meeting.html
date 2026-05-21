@@ -22,26 +22,36 @@
 <script>
   // 1. Listen for HubSpot's global "onFormReady" message event to inject the value early
 window.addEventListener('message', function(event) {
-  if (event.data.type === 'hsFormCallback' && event.data.eventName === 'onFormReady') {
-    
+  // Raw logger — remove once confirmed working
+  console.log('[partner.io] message received:', typeof event.data, event.data);
+
+  let eventData;
+  try {
+    eventData = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+  } catch(e) {
+    return;
+  }
+
+  if (eventData.type === 'hsFormCallback' && eventData.eventName === 'onFormReady') {
+
     // Find the specific form that just loaded using its ID
-    const form = document.querySelector(`[data-form-id="${event.data.id}"]`);
+    const form = document.querySelector(`[data-form-id="${eventData.id}"]`);
     if (!form) return;
 
     // Use a wildcard selector (name*=) because HubSpot dynamically prefixes field names (e.g., "0-1/temp_pio_plid")
     const plidField = form.querySelector('input[name*="temp_pio_plid"]');
-    
+
     if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
       const plidValue = window.partnerLinkLibrary.getPlid();
-      
+
       // Inject value cleanly into React state BEFORE submission
       plidField.value = plidValue;
       plidField.dispatchEvent(new Event('input', { bubbles: true }));
       plidField.dispatchEvent(new Event('change', { bubbles: true }));
-      
+
       console.log('[partner.io] PLID injected into HubSpot state on form load:', plidValue);
     } else {
-      console.warn('[partner.io] Could not inject PLID on load — field found:', !!plidField);
+      console.warn('[partner.io] Could not inject PLID on load — field found:', !!plidField, '| form el:', form);
     }
   }
 });
