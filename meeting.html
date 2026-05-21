@@ -19,68 +19,47 @@
 
 <body>
   <script>
-    // A reliable function to update the HubSpot React state using the native descriptor workaround
-    function injectPlidToHubSpotForm(formElement) {
-      if (!formElement) return;
-
-      const fieldName = 'temp_pio_plid';
-      const plidField = formElement.querySelector(`input[name*="${fieldName}"]`);
-
-      if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
-        const plidValue = window.partnerLinkLibrary.getPlid();
-
-        // Force set the tracking value
-        plidField.value = plidValue;
-
-        // Locate React's hidden internal state tracker tracker
-        const tracker = plidField._valueTracker;
-        if (tracker) {
-          tracker.setValue(plidValue);
-        }
-
-        // Dispatch every event variation HubSpot listens for across legacy and v4 platforms
-        ['input', 'change', 'blur'].forEach(eventName => {
-          const event = new Event(eventName, { bubbles: true, cancelable: true });
-          plidField.dispatchEvent(event);
-        });
-
-        console.log('[partner.io] Shadow DOM React state updated cleanly:', plidValue);
-        return true;
+    function injectPlid() {
+      if (!window.HubSpotFormsV4) {
+        console.warn('[partner.io] HubSpotFormsV4 not available');
+        return false;
       }
-      return false;
+      if (!window.partnerLinkLibrary || typeof window.partnerLinkLibrary.getPlid !== 'function') {
+        console.warn('[partner.io] getPlid not available');
+        return false;
+      }
+
+      const hsForms = window.HubSpotFormsV4.getForms();
+      if (!hsForms || hsForms.length === 0) {
+        console.warn('[partner.io] No HubSpot forms registered yet');
+        return false;
+      }
+
+      const plidValue = window.partnerLinkLibrary.getPlid();
+      hsForms[0].setFieldValue('0-1/temp_pio_plid', plidValue);
+      console.log('[partner.io] PLID set via HubSpotFormsV4:', plidValue);
+      return true;
     }
 
-    // 1. BACKUP: If the script loaded late and the form is already on the page, update it now
-    const existingForm = document.querySelector('form');
-    if (existingForm) {
-      console.log('[partner.io] Form already present on execution, injecting value...');
-      injectPlidToHubSpotForm(existingForm);
-    }
-
-    // 2. PRIMARY TRACKER: Use your MutationObserver to capture the form element the millisecond it injects into the DOM
     const observer = new MutationObserver(function (mutations, obs) {
       const form = document.querySelector('form');
       if (form) {
-        console.log('[partner.io] Form detected in DOM via Observer');
+        console.log('[partner.io] Form detected, injecting PLID and attaching submit listener');
+        obs.disconnect();
 
-        // Inject the PLID right away while the form is initializing
-        injectPlidToHubSpotForm(form);
+        injectPlid();
 
-        // Attach your submission tracking listener
-        console.log('[partner.io] Attaching sign-up tracking listener');
-        form.addEventListener('submit', function (event) {
+        form.addEventListener('submit', function () {
+          // Re-set immediately before HubSpot reads state for submission
+          injectPlid();
           console.log('[partner.io] Form submitted, recording sign-up event');
           const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
           window.partnerLinkLibrary.recordSignUpEvent(data);
         });
-
-        obs.disconnect();
-        console.log('[partner.io] Mutation observer disconnected successfully');
       }
     });
 
-    // Start tracking the DOM transitions
-    observer.observe(document.body, { childList: true, subtree: true }); 
+    observer.observe(document.body, { childList: true, subtree: true });
   </script>
 
   <script src="https://js-eu1.hsforms.net/forms/embed/developer/145620171.js" defer></script>
