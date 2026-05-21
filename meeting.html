@@ -19,58 +19,49 @@
 
 <body>
   <script>
-    // 1. Listen for HubSpot's global form ready event to update internal state safely
-    window.addEventListener('message', function (event) {
-      console.log(event);
-      if (event.data.type === 'hsFormCallback' && event.data.eventName === 'onFormReady') {
+    // A reliable function to update the HubSpot React state using the native descriptor workaround
+    function injectPlidToHubSpotForm(formElement) {
+      if (!formElement) return;
 
-        if (window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
-          const plidValue = window.partnerLinkLibrary.getPlid();
-          const fieldName = 'temp_pio_plid';
+      const fieldName = 'temp_pio_plid';
+      // Use wildcard to catch '0-1/temp_pio_plid' or any variations
+      const plidField = formElement.querySelector(`input[name*="${fieldName}"]`);
 
-          // OPTION A: The Modern HubSpot v4 Way (Bypasses React DOM tracking entirely)
-          if (window.HubSpotFormsV4) {
-            try {
-              const hsForms = window.HubSpotFormsV4.getForms();
-              if (hsForms && hsForms.length > 0) {
-                // HubSpot uses '0-1/fieldName' for its internal state dictionary
-                hsForms[0].setFieldValue(`0-1/${fieldName}`, plidValue);
-                console.log('[partner.io] PLID successfully injected via HubSpotFormsV4 API:', plidValue);
-                return; // Exit if modern method succeeds
-              }
-            } catch (err) {
-              console.warn('[partner.io] Failed updating via HubSpotFormsV4 API, falling back to DOM:', err);
-            }
-          }
+      if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
+        const plidValue = window.partnerLinkLibrary.getPlid();
 
-          // OPTION B: Bulletproof DOM Fallback (If v4 global object is isolated)
-          const form = document.querySelector(`[data-form-id="${event.data.id}"]`);
-          if (form) {
-            const plidField = form.querySelector(`input[name*="${fieldName}"]`);
-            if (plidField) {
-              plidField.value = plidValue;
+        // Force set the value bypassing React's internal value tracking setter override
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        nativeInputValueSetter.call(plidField, plidValue);
 
-              // Dispatch a React-compatible native event simulation
-              const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-              nativeInputValueSetter.call(plidField, plidValue);
+        // Bubble the events up so HubSpot updates its internal state store
+        plidField.dispatchEvent(new Event('input', { bubbles: true }));
+        plidField.dispatchEvent(new Event('change', { bubbles: true }));
 
-              plidField.dispatchEvent(new Event('input', { bubbles: true }));
-              plidField.dispatchEvent(new Event('change', { bubbles: true }));
-              console.log('[partner.io] PLID injected via native React tracker fallback:', plidValue);
-            }
-          }
-        } else {
-          console.warn('[partner.io] partnerLinkLibrary or getPlid was not available during form load.');
-        }
+        console.log('[partner.io] PLID injected and state updated successfully:', plidValue);
+        return true;
       }
-    });
+      return false;
+    }
 
-    // 2. Your MutationObserver purely focused on capturing the submitted tracking payload
+    // 1. BACKUP: If the script loaded late and the form is already on the page, update it now
+    const existingForm = document.querySelector('form');
+    if (existingForm) {
+      console.log('[partner.io] Form already present on execution, injecting value...');
+      injectPlidToHubSpotForm(existingForm);
+    }
+
+    // 2. PRIMARY TRACKER: Use your MutationObserver to capture the form element the millisecond it injects into the DOM
     const observer = new MutationObserver(function (mutations, obs) {
       const form = document.querySelector('form');
       if (form) {
-        console.log('[partner.io] Form found, attaching sign-up tracking listener');
+        console.log('[partner.io] Form detected in DOM via Observer');
 
+        // Inject the PLID right away while the form is initializing
+        injectPlidToHubSpotForm(form);
+
+        // Attach your submission tracking listener
+        console.log('[partner.io] Attaching sign-up tracking listener');
         form.addEventListener('submit', function (event) {
           console.log('[partner.io] Form submitted, recording sign-up event');
           const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
@@ -78,12 +69,12 @@
         });
 
         obs.disconnect();
-        console.log('[partner.io] Tracking listener attached successfully');
+        console.log('[partner.io] Mutation observer disconnected successfully');
       }
     });
 
-    // Start tracking the DOM
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Start tracking the DOM transitions
+    observer.observe(document.body, { childList: true, subtree: true }); 
   </script>
 
   <script src="https://js-eu1.hsforms.net/forms/embed/developer/145620171.js" defer></script>
