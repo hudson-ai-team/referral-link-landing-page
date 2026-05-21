@@ -28,6 +28,10 @@
       console.log('[partner.io] Form found, attaching submit listener:', form);
       form.addEventListener('submit', function(event) {
         console.log('[partner.io] Form submitted, recording sign-up event');
+        const plidField = form.querySelector('input[name="0-1/temp_pio_plid"]');
+        if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
+          plidField.value = window.partnerLinkLibrary.getPlid();
+        }
         const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
         window.partnerLinkLibrary.recordSignUpEvent(data);
       });
