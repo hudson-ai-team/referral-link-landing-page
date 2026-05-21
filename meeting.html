@@ -24,6 +24,7 @@
   <script>
     // 1. Listen for HubSpot's global form ready event to update internal state safely
     window.addEventListener('message', function (event) {
+      console.log(event);
       if (event.data.type === 'hsFormCallback' && event.data.eventName === 'onFormReady') {
 
         if (window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
