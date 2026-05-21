@@ -50,7 +50,12 @@
         console.log('[partner.io] Form detected, injecting PLID and attaching submit listener');
         obs.disconnect();
 
-        injectPlid();
+        // Retry until HubSpotFormsV4 is ready (deferred script may not have run yet)
+        function injectPlidWhenReady(attemptsLeft) {
+          if (injectPlid()) return;
+          if (attemptsLeft > 0) setTimeout(() => injectPlidWhenReady(attemptsLeft - 1), 100);
+        }
+        injectPlidWhenReady(20);
 
         form.addEventListener('submit', function () {
           // Re-set immediately before HubSpot reads state for submission
