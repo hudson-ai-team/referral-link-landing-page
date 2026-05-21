@@ -20,63 +20,51 @@
 <script src="https://js-eu1.hsforms.net/forms/embed/developer/145620171.js" defer></script>
 <div class="hs-form-html" data-region="eu1" data-form-id="b5184a88-3119-4a08-abd4-6ee9acae9e31" data-portal-id="145620171"></div>
 <script>
-  // 1. Listen for HubSpot's global "onFormReady" message event to inject the value early
-window.addEventListener('message', function(event) {
-  // Raw logger — remove once confirmed working
-  console.log('[partner.io] message received:', typeof event.data, event.data);
-
-  let eventData;
-  try {
-    eventData = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-  } catch(e) {
-    return;
-  }
-
-  if (eventData.type === 'hsFormCallback' && eventData.eventName === 'onFormReady') {
-
-    // Find the specific form that just loaded using its ID
-    const form = document.querySelector(`[data-form-id="${eventData.id}"]`);
-    if (!form) return;
-
-    // Use a wildcard selector (name*=) because HubSpot dynamically prefixes field names (e.g., "0-1/temp_pio_plid")
-    const plidField = form.querySelector('input[name*="temp_pio_plid"]');
-
-    if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
+  function injectPlid(field) {
+    if (window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
       const plidValue = window.partnerLinkLibrary.getPlid();
-
-      // Inject value cleanly into React state BEFORE submission
-      plidField.value = plidValue;
-      plidField.dispatchEvent(new Event('input', { bubbles: true }));
-      plidField.dispatchEvent(new Event('change', { bubbles: true }));
-
-      console.log('[partner.io] PLID injected into HubSpot state on form load:', plidValue);
+      field.value = plidValue;
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      console.log('[partner.io] PLID injected:', plidValue);
     } else {
-      console.warn('[partner.io] Could not inject PLID on load — field found:', !!plidField, '| form el:', form);
+      console.warn('[partner.io] getPlid not available');
     }
   }
-});
 
-// 2. Keep your MutationObserver solely for attaching your custom tracking listener on submission
-const observer = new MutationObserver(function(mutations, obs) {
-  const form = document.querySelector('form');
-  if (form) {
-    console.log('[partner.io] Form found, attaching tracking listener:', form);
-    
-    form.addEventListener('submit', function(event) {
-      console.log('[partner.io] Form submitted, recording sign-up event');
-      
-      // We no longer inject the PLID value here because the window listener above already handled it.
-      // Simply extract your sign-up data and record the event.
-      const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
-      window.partnerLinkLibrary.recordSignUpEvent(data);
-    });
-    
-    obs.disconnect();
-    console.log('[partner.io] Tracking listener attached successfully');
-  }
-});
+  const observer = new MutationObserver(function(mutations, obs) {
+    const form = document.querySelector('form');
+    if (form) {
+      console.log('[partner.io] Form found, attaching listeners:', form);
+      obs.disconnect();
 
-// Start monitoring the DOM for the form element
-observer.observe(document.body, { childList: true, subtree: true });
+      // Watch for the hidden PLID field to appear inside the form
+      const fieldObserver = new MutationObserver(function(_, fieldObs) {
+        const plidField = form.querySelector('input[name*="temp_pio_plid"]');
+        if (plidField) {
+          fieldObs.disconnect();
+          injectPlid(plidField);
+        }
+      });
+
+      // Check immediately in case the field is already present
+      const plidField = form.querySelector('input[name*="temp_pio_plid"]');
+      if (plidField) {
+        injectPlid(plidField);
+      } else {
+        fieldObserver.observe(form, { childList: true, subtree: true });
+      }
+
+      form.addEventListener('submit', function() {
+        console.log('[partner.io] Form submitted, recording sign-up event');
+        const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
+        window.partnerLinkLibrary.recordSignUpEvent(data);
+      });
+
+      console.log('[partner.io] Listeners attached successfully');
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
