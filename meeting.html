@@ -31,7 +31,15 @@
         debugger;
         const plidField = form.querySelector('input[name="0-1/temp_pio_plid"]');
         if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
+
+          // Set hidden field value.
           plidField.value = window.partnerLinkLibrary.getPlid();
+
+          // Dispatch an event to cause form state to be recalculated.
+          const event = new Event('input', { bubbles: true });
+          plidField.dispatchEvent(event);
+
+
           console.log('[partner.io] temp_pio_plid set to:', plidField.value);
         } else {
           console.warn('[partner.io] Could not set temp_pio_plid — field found:', !!plidField, '| getPlid available:', !!(window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function'));
