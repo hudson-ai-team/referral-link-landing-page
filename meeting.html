@@ -20,38 +20,53 @@
 <script src="https://js-eu1.hsforms.net/forms/embed/developer/145620171.js" defer></script>
 <div class="hs-form-html" data-region="eu1" data-form-id="b5184a88-3119-4a08-abd4-6ee9acae9e31" data-portal-id="145620171"></div>
 <script>
-  console.log('[partner.io] Waiting for HubSpot form to appear in DOM...');
+  // 1. Listen for HubSpot's global "onFormReady" message event to inject the value early
+window.addEventListener('message', function(event) {
+  if (event.data.type === 'hsFormCallback' && event.data.eventName === 'onFormReady') {
+    
+    // Find the specific form that just loaded using its ID
+    const form = document.querySelector(`[data-form-id="${event.data.id}"]`);
+    if (!form) return;
 
-  const observer = new MutationObserver(function(mutations, obs) {
-    const form = document.querySelector('form');
-    if (form) {
-      console.log('[partner.io] Form found, attaching submit listener:', form);
-      form.addEventListener('submit', function(event) {
-        console.log('[partner.io] Form submitted, recording sign-up event');
-        debugger;
-        const plidField = form.querySelector('input[name="0-1/temp_pio_plid"]');
-        if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
-
-          // Set hidden field value.
-          plidField.value = window.partnerLinkLibrary.getPlid();
-
-          // Dispatch an event to cause form state to be recalculated.
-          const event = new Event('input', { bubbles: true });
-          plidField.dispatchEvent(event);
-
-
-          console.log('[partner.io] temp_pio_plid set to:', plidField.value);
-        } else {
-          console.warn('[partner.io] Could not set temp_pio_plid — field found:', !!plidField, '| getPlid available:', !!(window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function'));
-        }
-        const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
-        window.partnerLinkLibrary.recordSignUpEvent(data);
-      });
-      obs.disconnect();
-      console.log('[partner.io] Submit listener attached successfully');
+    // Use a wildcard selector (name*=) because HubSpot dynamically prefixes field names (e.g., "0-1/temp_pio_plid")
+    const plidField = form.querySelector('input[name*="temp_pio_plid"]');
+    
+    if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
+      const plidValue = window.partnerLinkLibrary.getPlid();
+      
+      // Inject value cleanly into React state BEFORE submission
+      plidField.value = plidValue;
+      plidField.dispatchEvent(new Event('input', { bubbles: true }));
+      plidField.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      console.log('[partner.io] PLID injected into HubSpot state on form load:', plidValue);
+    } else {
+      console.warn('[partner.io] Could not inject PLID on load — field found:', !!plidField);
     }
-  });
+  }
+});
 
-  observer.observe(document.body, { childList: true, subtree: true });
+// 2. Keep your MutationObserver solely for attaching your custom tracking listener on submission
+const observer = new MutationObserver(function(mutations, obs) {
+  const form = document.querySelector('form');
+  if (form) {
+    console.log('[partner.io] Form found, attaching tracking listener:', form);
+    
+    form.addEventListener('submit', function(event) {
+      console.log('[partner.io] Form submitted, recording sign-up event');
+      
+      // We no longer inject the PLID value here because the window listener above already handled it.
+      // Simply extract your sign-up data and record the event.
+      const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
+      window.partnerLinkLibrary.recordSignUpEvent(data);
+    });
+    
+    obs.disconnect();
+    console.log('[partner.io] Tracking listener attached successfully');
+  }
+});
+
+// Start monitoring the DOM for the form element
+observer.observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
