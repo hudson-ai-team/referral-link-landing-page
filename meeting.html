@@ -24,21 +24,27 @@
       if (!formElement) return;
 
       const fieldName = 'temp_pio_plid';
-      // Use wildcard to catch '0-1/temp_pio_plid' or any variations
       const plidField = formElement.querySelector(`input[name*="${fieldName}"]`);
 
       if (plidField && window.partnerLinkLibrary && typeof window.partnerLinkLibrary.getPlid === 'function') {
         const plidValue = window.partnerLinkLibrary.getPlid();
 
-        // Force set the value bypassing React's internal value tracking setter override
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        nativeInputValueSetter.call(plidField, plidValue);
+        // Force set the tracking value
+        plidField.value = plidValue;
 
-        // Bubble the events up so HubSpot updates its internal state store
-        plidField.dispatchEvent(new Event('input', { bubbles: true }));
-        plidField.dispatchEvent(new Event('change', { bubbles: true }));
+        // Locate React's hidden internal state tracker tracker
+        const tracker = plidField._valueTracker;
+        if (tracker) {
+          tracker.setValue(plidValue);
+        }
 
-        console.log('[partner.io] PLID injected and state updated successfully:', plidValue);
+        // Dispatch every event variation HubSpot listens for across legacy and v4 platforms
+        ['input', 'change', 'blur'].forEach(eventName => {
+          const event = new Event(eventName, { bubbles: true, cancelable: true });
+          plidField.dispatchEvent(event);
+        });
+
+        console.log('[partner.io] Shadow DOM React state updated cleanly:', plidValue);
         return true;
       }
       return false;
