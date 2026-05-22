@@ -22,27 +22,36 @@
   <div class="hs-form-html" data-region="eu1" data-form-id="b5184a88-3119-4a08-abd4-6ee9acae9e31"
     data-portal-id="145620171"></div>
   <script>
+    let _hsFormsV4 = null;
+    let _pendingInject = false;
+
     function injectPlid() {
-      if (!window.HubSpotFormsV4) {
-        console.warn('[partner.io] HubSpotFormsV4 not available');
-        return false;
-      }
+      if (!_hsFormsV4) return;
       if (!window.partnerLinkLibrary || typeof window.partnerLinkLibrary.getPlid !== 'function') {
         console.warn('[partner.io] getPlid not available');
-        return false;
+        return;
       }
-
-      const hsForms = window.HubSpotFormsV4.getForms();
+      const hsForms = _hsFormsV4.getForms();
       if (!hsForms || hsForms.length === 0) {
         console.warn('[partner.io] No HubSpot forms registered yet');
-        return false;
+        return;
       }
-
       const plidValue = window.partnerLinkLibrary.getPlid();
       hsForms[0].setFieldValue('0-1/temp_pio_plid', plidValue);
       console.log('[partner.io] PLID set via HubSpotFormsV4:', plidValue);
-      return true;
+      _pendingInject = false;
     }
+
+    // Intercept the moment HubSpot assigns window.HubSpotFormsV4
+    Object.defineProperty(window, 'HubSpotFormsV4', {
+      get() { return _hsFormsV4; },
+      set(value) {
+        _hsFormsV4 = value;
+        console.log('[partner.io] HubSpotFormsV4 became available');
+        if (_pendingInject) injectPlid();
+      },
+      configurable: true,
+    });
 
     const observer = new MutationObserver(function (mutations, obs) {
       const form = document.querySelector('form');
@@ -50,15 +59,15 @@
         console.log('[partner.io] Form detected, injecting PLID and attaching submit listener');
         obs.disconnect();
 
-        // Retry until HubSpotFormsV4 is ready (deferred script may not have run yet)
-        function injectPlidWhenReady(attemptsLeft) {
-          if (injectPlid()) return;
-          if (attemptsLeft > 0) setTimeout(() => injectPlidWhenReady(attemptsLeft - 1), 100);
+        if (_hsFormsV4) {
+          injectPlid();
+        } else {
+          // Library not ready yet — flag so the setter above fires injectPlid when it arrives
+          _pendingInject = true;
+          console.log('[partner.io] Waiting for HubSpotFormsV4...');
         }
-        injectPlidWhenReady(20);
 
         form.addEventListener('submit', function () {
-          // Re-set immediately before HubSpot reads state for submission
           injectPlid();
           console.log('[partner.io] Form submitted, recording sign-up event');
           const data = window.partnerLinkLibrary.getSignUpDataFromFormElement(form);
